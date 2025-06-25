@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detail Berita</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Poppins', sans-serif; scroll-behavior: smooth; }
+    .kategori-link.active { font-weight: 600; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+  <!-- Marquee -->
+  <div class="bg-yellow-100 text-yellow-800 text-sm py-2 border-b border-black">
+    <marquee>🔥 Selamat datang di Berita Kini — kabar terbaru dan terpopuler hari ini!</marquee>
+  </div>
+
+  <!-- Navbar -->
+  <header id="navbar" class="sticky top-0 z-50 flex items-center justify-between px-4 py-4 bg-white text-black shadow transition-all duration-300">
+    <div class="flex items-center gap-3">
+      <img src="./assets/logo info.jpg" alt="Logo" class="h-9 w-9 rounded-full object-cover" />
+      <h1 id="logo-title" class="text-xl font-bold animate-pulse text-black transition-all">Info Mase</h1>
+    </div>
+    <nav class="flex flex-wrap gap-3 text-sm" id="kategori-nav"></nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Artikel -->
+    <article class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+      <div id="konten-berita"></div>
+
+      <!-- Komentar -->
+      <section class="mt-8">
+        <h2 class="text-lg font-semibold mb-4">💬 Komentar</h2>
+        <form id="komentar-form" class="space-y-3 mb-6">
+          <input required id="nama" placeholder="Nama Anda" class="w-full border border-gray-300 rounded px-3 py-2" />
+          <textarea required id="isi" placeholder="Tulis komentar..." class="w-full border border-gray-300 rounded px-3 py-2"></textarea>
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Kirim Komentar</button>
+        </form>
+        <div id="daftar-komentar" class="space-y-4"></div>
+      </section>
+    </article>
+
+    <!-- Sidebar -->
+    <aside class="bg-white rounded-lg shadow p-4 space-y-8">
+      <div>
+        <h2 class="text-lg font-semibold mb-3">📌 Berita Terkait</h2>
+        <div id="berita-terkait" class="space-y-4"></div>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold mb-3">🔥 Berita Lainnya</h2>
+        <div id="berita-lainnya" class="space-y-4"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Footer -->
+  <div id="footer-container" class="mt-6"></div>
+
+  <script>
+    const BASE_URL = "https://api-berita-indonesia.vercel.app/antara";
+    const categories = [
+      { name: "Beranda", path: "terbaru" },
+      { name: "Politik", path: "politik" },
+      { name: "Hukum", path: "hukum" },
+      { name: "Ekonomi", path: "ekonomi" },
+      { name: "Olahraga", path: "olahraga" },
+      { name: "Bola", path: "bola" },
+      { name: "Hiburan", path: "hiburan" },
+    ];
+
+    let berita = {};
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadCategories();
+      tampilkanDetailBerita();
+      fetchBeritaTerkait();
+      fetchBeritaLainnya();
+      tampilkanKomentar();
+
+      // Form komentar
+      document.getElementById('komentar-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const nama = document.getElementById('nama').value.trim();
+        const isi = document.getElementById('isi').value.trim();
+        if (nama && isi) {
+          const semua = JSON.parse(localStorage.getItem('komentar-' + berita.title) || '[]');
+          semua.push({ nama, isi });
+          localStorage.setItem('komentar-' + berita.title, JSON.stringify(semua));
+          document.getElementById('komentar-form').reset();
+          tampilkanKomentar();
+        }
+      });
+
+      // Navbar scroll effect
+      window.addEventListener("scroll", () => {
+        const navbar = document.getElementById("navbar");
+        const logo = document.getElementById("logo-title");
+        const navLinks = document.querySelectorAll(".kategori-link");
+        if (window.scrollY > 50) {
+          navbar.classList.add("bg-blue-800", "text-white");
+          navbar.classList.remove("bg-white", "text-black");
+          logo.classList.replace("text-black", "text-white");
+          navLinks.forEach(link => {
+            if (link.classList.contains("active")) {
+              link.classList.replace("text-yellow-700", "text-yellow-300");
+            }
+          });
+        } else {
+          navbar.classList.remove("bg-blue-800", "text-white");
+          navbar.classList.add("bg-white", "text-black");
+          logo.classList.replace("text-white", "text-black");
+          navLinks.forEach(link => {
+            if (link.classList.contains("active")) {
+              link.classList.replace("text-yellow-300", "text-yellow-700");
+            }
+          });
+        }
+      });
+    });
+
+    function loadCategories() {
+      const nav = document.getElementById("kategori-nav");
+      categories.forEach((cat, i) => {
+        const a = document.createElement("a");
+        a.href = "index.html";
+        a.textContent = cat.name;
+        a.className = "kategori-link transition-colors " + (i === 0 ? "text-yellow-700 active" : "");
+        a.addEventListener("click", () => {
+          localStorage.setItem("selected-category", cat.path);
+        });
+        nav.appendChild(a);
+      });
+    }
+
+    function tampilkanDetailBerita() {
+      berita = JSON.parse(localStorage.getItem('berita-detail') || '{}');
+      const konten = document.getElementById('konten-berita');
+      konten.innerHTML = `
+        <h2 class="text-2xl font-bold mb-2">${berita.title}</h2>
+        <p class="text-sm text-gray-500 mb-4">${berita.pubDate}</p>
+        <img src="${berita.thumbnail || 'https://via.placeholder.com/600x400'}" class="w-full rounded mb-4" />
+        <p class="text-base">${berita.description || 'Tidak ada deskripsi.'}</p>
+        <div class="flex gap-4 mt-6">
+          <a href="index.html" class="text-blue-600 hover:underline text-sm">← Kembali ke Beranda</a>
+          <a href="${berita.link}" target="_blank" class="text-yellow-600 hover:underline text-sm">🌐 Baca Berita Aslinya</a>
+        </div>
+      `;
+    }
+
+    function getKategoriDariLink(link) {
+      for (let cat of categories) {
+        if (link.includes(`/${cat.path}/`)) return cat.path;
+      }
+      return "terbaru";
+    }
+
+    function fetchBeritaTerkait() {
+      const kategori = getKategoriDariLink(berita.link);
+      if (!kategori) return;
+      fetch(`${BASE_URL}/${kategori}`)
+        .then(res => res.json())
+        .then(data => {
+          const list = data.data.posts.filter(p => p.title !== berita.title).slice(0, 5);
+          const container = document.getElementById('berita-terkait');
+          container.innerHTML = "";
+          list.forEach(item => {
+            const div = document.createElement("div");
+            div.innerHTML = `
+              <div class="flex gap-3">
+                <img src="${item.thumbnail}" class="w-16 h-16 object-cover rounded" />
+                <div>
+                  <p class="text-sm font-semibold">${item.title}</p>
+                  <p class="text-xs text-gray-500">${item.pubDate}</p>
+                  <a href="detail.html" onclick='simpanDetail(${JSON.stringify(item)})' class="text-xs text-blue-600 hover:underline">Baca</a>
+                </div>
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        });
+    }
+
+    function fetchBeritaLainnya() {
+      fetch(`${BASE_URL}/terbaru`)
+        .then(res => res.json())
+        .then(data => {
+          const list = data.data.posts.filter(p => p.title !== berita.title).slice(0, 5);
+          const container = document.getElementById('berita-lainnya');
+          container.innerHTML = "";
+          list.forEach(item => {
+            const div = document.createElement("div");
+            div.innerHTML = `
+              <div class="flex gap-3">
+                <img src="${item.thumbnail}" class="w-16 h-16 object-cover rounded" />
+                <div>
+                  <p class="text-sm font-semibold">${item.title}</p>
+                  <p class="text-xs text-gray-500">${item.pubDate}</p>
+                  <a href="detail.html" onclick='simpanDetail(${JSON.stringify(item)})' class="text-xs text-blue-600 hover:underline">Baca</a>
+                </div>
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        });
+    }
+
+    function tampilkanKomentar() {
+      const container = document.getElementById('daftar-komentar');
+      const semua = JSON.parse(localStorage.getItem('komentar-' + berita.title) || '[]');
+      container.innerHTML = semua.map(k => `
+        <div class="border-t pt-3">
+          <p class="text-sm font-semibold">${k.nama}</p>
+          <p class="text-sm text-gray-700">${k.isi}</p>
+        </div>
+      `).join('');
+    }
+
+    function simpanDetail(data) {
+      localStorage.setItem('berita-detail', JSON.stringify(data));
+    }
+
+    // Load footer dan isi kategori
+    fetch('./components/footer.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('footer-container').innerHTML = html;
+        isiFooterKategori();
+      });
+
+    function isiFooterKategori() {
+      const footerNav = document.getElementById("footer-nav");
+      if (!footerNav) return;
+      footerNav.innerHTML = '';
+      categories.forEach(cat => {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = "index.html";
+        a.textContent = cat.name;
+        a.className = "hover:underline block";
+        a.addEventListener("click", () => {
+          localStorage.setItem("selected-category", cat.path);
+        });
+        li.appendChild(a);
+        footerNav.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>

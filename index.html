@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Berita Kini</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Poppins', sans-serif; scroll-behavior: smooth; }
+    .dot {
+      height: 10px;
+      width: 10px;
+      margin: 0 4px;
+      background-color: #bbb;
+      border-radius: 50%;
+      display: inline-block;
+      transition: background-color 0.3s;
+    }
+    .dot.active { background-color: #facc15; }
+    .kategori-link.active {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <!-- Marquee -->
+  <div class="bg-yellow-100 text-yellow-800 text-sm py-2 border-b border-black">
+    <marquee>🔥 Selamat datang di Berita Kini — kabar terbaru dan terpopuler hari ini!</marquee>
+  </div>
+
+  <!-- Navbar -->
+  <header id="navbar" class="sticky top-0 z-50 flex items-center justify-between px-4 py-4 bg-white text-black shadow transition-all duration-300">
+    <div class="flex items-center gap-3">
+      <img src="./assets/logo info.jpg" alt="Logo" class="h-9 w-9 rounded-full object-cover" />
+      <h1 id="logo-title" class="text-xl font-bold animate-pulse text-black transition-all">Info Mase</h1>
+    </div>
+    <nav class="flex flex-wrap gap-3 text-sm" id="kategori-nav"></nav>
+  </header>
+
+  <!-- Headline Slider -->
+  <section class="p-4">
+    <div class="relative max-w-5xl mx-auto rounded-xl overflow-hidden shadow-lg">
+      <div id="headline-slider" class="relative h-[400px] bg-black"></div>
+      <button id="prev" class="absolute left-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 text-white p-3 rounded-full hover:bg-opacity-70">❮</button>
+      <button id="next" class="absolute right-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 text-white p-3 rounded-full hover:bg-opacity-70">❯</button>
+      <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex" id="slider-dots"></div>
+    </div>
+  </section>
+
+  <!-- Berita Terpopuler -->
+  <section class="p-4">
+    <h2 class="text-xl font-semibold mb-4">🔥 Berita Terpopuler</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-4" id="terpopuler-container"></div>
+  </section>
+
+  <!-- Rekomendasi Untuk Anda -->
+  <section class="p-4">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">📌 Rekomendasi Untuk Anda</h2>
+      <input type="text" id="search-input" placeholder="Cari berita..." class="border border-gray-300 rounded-lg px-4 py-2 w-80 text-base focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+    </div>
+    <div id="berita-container" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-500"></div>
+    <div class="flex justify-between items-center mt-4">
+      <button id="prev-page" class="text-sm px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">← Previous</button>
+      <div id="pagination" class="flex gap-2"></div>
+      <button id="next-page" class="text-sm px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next →</button>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div id="footer-container"></div>
+
+  <script>
+    const BASE_URL = "https://api-berita-indonesia.vercel.app/antara";
+    const categories = [
+      { name: "Beranda", path: "terbaru" },
+      { name: "Politik", path: "politik" },
+      { name: "Hukum", path: "hukum" },
+      { name: "Ekonomi", path: "ekonomi" },
+      { name: "Olahraga", path: "olahraga" },
+      { name: "Bola", path: "bola" },
+      { name: "Hiburan", path: "hiburan" },
+    ];
+
+    let currentSlide = 0;
+    let headlineList = [];
+    let beritaList = [];
+    let currentPage = 1;
+    const beritaPerPage = 9;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCategories();
+      fetchBerita("terbaru");
+
+      document.getElementById('prev').addEventListener('click', () => showSlide((currentSlide - 1 + headlineList.length) % headlineList.length));
+      document.getElementById('next').addEventListener('click', () => showSlide((currentSlide + 1) % headlineList.length));
+      setInterval(() => showSlide((currentSlide + 1) % headlineList.length), 5000);
+
+      document.getElementById('search-input').addEventListener('input', e => {
+        const keyword = e.target.value.toLowerCase();
+        const filtered = beritaList.filter(b => b.title.toLowerCase().includes(keyword));
+        currentPage = 1;
+        renderBerita(filtered);
+      });
+
+      document.getElementById('prev-page').onclick = () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderBerita(beritaList);
+        }
+      };
+      document.getElementById('next-page').onclick = () => {
+        const maxPage = Math.ceil(beritaList.length / beritaPerPage);
+        if (currentPage < maxPage) {
+          currentPage++;
+          renderBerita(beritaList);
+        }
+      };
+
+      window.addEventListener("scroll", () => {
+        const navbar = document.getElementById("navbar");
+        const logo = document.getElementById("logo-title");
+        const navLinks = document.querySelectorAll(".kategori-link");
+
+        if (window.scrollY > 50) {
+          navbar.classList.add("bg-blue-800", "text-white");
+          navbar.classList.remove("bg-white", "text-black");
+          logo.classList.replace("text-black", "text-white");
+          navLinks.forEach(link => {
+            if (link.classList.contains("active")) {
+              link.classList.replace("text-yellow-700", "text-yellow-300");
+            }
+          });
+        } else {
+          navbar.classList.remove("bg-blue-800", "text-white");
+          navbar.classList.add("bg-white", "text-black");
+          logo.classList.replace("text-white", "text-black");
+          navLinks.forEach(link => {
+            if (link.classList.contains("active")) {
+              link.classList.replace("text-yellow-300", "text-yellow-700");
+            }
+          });
+        }
+      });
+    });
+
+    function loadCategories() {
+      const nav = document.getElementById("kategori-nav");
+      categories.forEach((cat, i) => {
+        const a = document.createElement("a");
+        a.href = "#";
+        a.textContent = cat.name;
+        a.className = "kategori-link transition-colors " + (i === 0 ? "text-yellow-700 active" : "");
+        a.addEventListener("click", e => {
+          e.preventDefault();
+          fetchBerita(cat.path);
+          document.querySelectorAll(".kategori-link").forEach(link => link.classList.remove("text-yellow-700", "text-yellow-300", "active"));
+          a.classList.add("active");
+          a.classList.add(window.scrollY > 50 ? "text-yellow-300" : "text-yellow-700");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        nav.appendChild(a);
+      });
+    }
+
+    function fetchBerita(kategori) {
+      fetch(`${BASE_URL}/${kategori}`)
+        .then(res => res.json())
+        .then(data => {
+          const all = data.data.posts;
+          headlineList = all.slice(0, 5);
+          beritaList = all.slice(10);
+          renderHeadlines();
+          renderList(all.slice(5, 10), "terpopuler-container");
+          renderBerita(beritaList);
+        });
+    }
+
+    function renderHeadlines() {
+      const slider = document.getElementById('headline-slider');
+      const dots = document.getElementById('slider-dots');
+      slider.innerHTML = '';
+      dots.innerHTML = '';
+      headlineList.forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = `absolute inset-0 transition-opacity duration-500 ${i === 0 ? '' : 'hidden'}`;
+        div.innerHTML = `
+          <div class="relative w-full h-full bg-center bg-cover" style="background-image: url('${b.thumbnail || "https://via.placeholder.com/800x400"}')">
+            <div class="absolute inset-0 bg-black bg-opacity-50 p-6 flex flex-col justify-end">
+              <h2 class="text-white text-2xl font-bold">${b.title}</h2>
+              <p class="text-sm text-gray-200">${b.pubDate}</p>
+              <a href="detail.html" onclick='simpanDetail(${JSON.stringify(b)})' class="text-yellow-300 mt-2 text-sm hover:underline">Baca Selengkapnya</a>
+            </div>
+          </div>`;
+        slider.appendChild(div);
+        const dot = document.createElement("span");
+        dot.className = "dot " + (i === 0 ? "active" : "");
+        dot.onclick = () => showSlide(i);
+        dots.appendChild(dot);
+      });
+    }
+
+    function showSlide(index) {
+      const slides = document.querySelectorAll("#headline-slider > div");
+      const dots = document.querySelectorAll(".dot");
+      slides.forEach((s, i) => s.classList.toggle("hidden", i !== index));
+      dots.forEach((d, i) => d.classList.toggle("active", i === index));
+      currentSlide = index;
+    }
+
+    function renderList(data, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      data.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "bg-white p-3 rounded shadow hover:shadow-xl hover:-translate-y-1 transition-all duration-300";
+        div.innerHTML = `
+          <img src="${item.thumbnail || 'https://via.placeholder.com/300x200'}" class="w-full h-36 object-cover rounded mb-2" />
+          <h3 class="font-semibold text-base mb-1">${item.title}</h3>
+          <p class="text-sm text-gray-500 mb-2">${item.pubDate}</p>
+          <a href="detail.html" onclick='simpanDetail(${JSON.stringify(item)})' class="text-blue-600 text-sm hover:underline">Baca Selengkapnya →</a>`;
+        container.appendChild(div);
+      });
+    }
+
+    function renderBerita(data) {
+      const container = document.getElementById("berita-container");
+      const start = (currentPage - 1) * beritaPerPage;
+      const end = start + beritaPerPage;
+      container.innerHTML = "";
+      data.slice(start, end).forEach(item => {
+        const div = document.createElement("div");
+        div.className = "bg-white p-3 rounded shadow hover:shadow-xl hover:-translate-y-1 transition-all duration-300";
+        div.innerHTML = `
+          <img src="${item.thumbnail || 'https://via.placeholder.com/300x200'}" class="w-full h-36 object-cover rounded mb-2" />
+          <h3 class="font-semibold text-base mb-1">${item.title}</h3>
+          <p class="text-sm text-gray-500 mb-2">${item.pubDate}</p>
+          <a href="detail.html" onclick='simpanDetail(${JSON.stringify(item)})' class="text-blue-600 text-sm hover:underline">Baca Selengkapnya →</a>`;
+        container.appendChild(div);
+      });
+
+      renderPagination(data.length);
+    }
+
+    function renderPagination(total) {
+      const maxPage = Math.ceil(total / beritaPerPage);
+      const pagination = document.getElementById("pagination");
+      pagination.innerHTML = "";
+      for (let i = 1; i <= maxPage; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.className = "px-3 py-1 rounded text-sm " + (i === currentPage ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300");
+        btn.onclick = () => {
+          currentPage = i;
+          renderBerita(beritaList);
+        };
+        pagination.appendChild(btn);
+      }
+    }
+
+    // ✅ FUNGSI PENTING: Menyimpan data ke localStorage agar detail.html bisa ambil
+    function simpanDetail(berita) {
+      localStorage.setItem('berita-detail', JSON.stringify(berita));
+    }
+
+    // Load Footer & Telusuri
+    fetch('./components/footer.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('footer-container').innerHTML = html;
+        isiFooterKategori();
+      });
+
+    function isiFooterKategori() {
+      const footerNav = document.getElementById("footer-nav");
+      if (!footerNav) return;
+
+      footerNav.innerHTML = '';
+      categories.forEach(cat => {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = "#";
+        a.textContent = cat.name;
+        a.className = "hover:underline block";
+        a.addEventListener("click", e => {
+          e.preventDefault();
+          fetchBerita(cat.path);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+
+          document.querySelectorAll(".kategori-link").forEach(link => {
+            link.classList.remove("text-yellow-700", "text-yellow-300", "active");
+            if (link.textContent === cat.name) {
+              link.classList.add("active", window.scrollY > 50 ? "text-yellow-300" : "text-yellow-700");
+            }
+          });
+        });
+        li.appendChild(a);
+        footerNav.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>
